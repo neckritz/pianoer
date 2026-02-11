@@ -27,20 +27,8 @@ const AppHeader = ({
         zIndex: 10,
       }}
     >
-      <h1>Pianoer</h1>
 
-      <button
-        onClick={onOpenSettings}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: 'white',
-          cursor: 'pointer',
-          fontSize: '1.5rem',
-        }}
-      >
-        {'\u2699\uFE0F'}
-      </button>
+      
 
       {isDualLike ? (
         <div

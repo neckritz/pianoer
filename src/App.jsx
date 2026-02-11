@@ -109,13 +109,7 @@ function App() {
     return (
         <div className="app-container">
             <FlyInToast />
-            <h1>
-            <CubeFlipText
-                text={scaleFlip.text}
-                direction={scaleFlip.direction}
-                ariaLabel={`Scale ${scaleFlip.text}`}
-            />
-            </h1>
+        
 
             {/* 1. GLOBAL UI (Always loaded) */}
             <SettingsModal
@@ -126,7 +120,7 @@ function App() {
             />
 
             {/* 2. HEADER (Always visible) */}
-            <AppHeader
+            {hasStarted ? false ? <AppHeader
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 isDualLike={piano.isDualLike}
                 leftShift={piano.leftShift}
@@ -140,7 +134,7 @@ function App() {
                 isScaleMode={piano.isScaleMode}
                 currentScaleLabel={piano.currentScale.label}
                 onShiftScale={piano.shiftScale}
-            />
+            /> : null : <h1>PIANOER</h1>}
 
             {/* 3. CONDITIONAL CONTENT */}
             {!hasStarted ? (
