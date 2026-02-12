@@ -1,10 +1,12 @@
 import React from 'react';
 import { motion, useAnimation } from 'framer-motion';
 
-const CubeFlipText = ({
+const CubeFlipElement = ({
   text,
   initialText,
   revealText,
+  children,
+  flipKey,
   direction = 'up',
   duration = 0.45,
   depth = '0.6em',
@@ -19,17 +21,25 @@ const CubeFlipText = ({
     normalized === 'down' || normalized === 'left' ? -90 : 90;
   const faceRotation = -hoverRotation;
   const controls = useAnimation();
-  const resolvedText = text ?? initialText ?? '';
-  const [frontText, setFrontText] = React.useState(resolvedText);
-  const [backText, setBackText] = React.useState(revealText ?? resolvedText);
-  const lastTextRef = React.useRef(resolvedText);
+
+  const resolvedContent = children ?? text ?? initialText ?? '';
+  const resolvedReveal = revealText ?? resolvedContent;
+  const isPrimitiveContent =
+    typeof resolvedContent === 'string' || typeof resolvedContent === 'number';
+  const resolvedFlipKey = flipKey ?? (isPrimitiveContent ? resolvedContent : undefined);
+  const resolvedAriaLabel =
+    ariaLabel ?? (isPrimitiveContent ? String(resolvedContent) : undefined);
+
+  const [frontContent, setFrontContent] = React.useState(resolvedContent);
+  const [backContent, setBackContent] = React.useState(resolvedReveal);
+  const lastKeyRef = React.useRef(resolvedFlipKey);
 
   React.useEffect(() => {
-    const nextText = text ?? initialText ?? '';
-    if (nextText === lastTextRef.current) return;
+    if (resolvedFlipKey == null) return;
+    if (Object.is(resolvedFlipKey, lastKeyRef.current)) return;
 
     let isActive = true;
-    setBackText(nextText);
+    setBackContent(resolvedContent);
     controls.stop();
     controls.set({ rotateX: 0, rotateY: 0 });
     controls
@@ -40,55 +50,59 @@ const CubeFlipText = ({
       })
       .then(() => {
         if (!isActive) return;
-        setFrontText(nextText);
-        setBackText(nextText);
-        lastTextRef.current = nextText;
+        setFrontContent(resolvedContent);
+        setBackContent(resolvedContent);
+        lastKeyRef.current = resolvedFlipKey;
         controls.set({ rotateX: 0, rotateY: 0 });
       });
     return () => {
       isActive = false;
     };
-  }, [text, initialText, axis, hoverRotation, duration, controls]);
+  }, [resolvedFlipKey, resolvedContent, axis, hoverRotation, duration, controls]);
 
   const backFaceTransform =
     axis === 'X'
       ? `rotateX(${faceRotation}deg) translateZ(var(--cube-depth))`
       : `rotateY(${faceRotation}deg) translateZ(var(--cube-depth))`;
 
+  const renderFront = resolvedFlipKey == null ? resolvedContent : frontContent;
+  const renderBack = resolvedFlipKey == null ? resolvedReveal : backContent;
+
   return (
-    <span
+    <div
       className={`cube-flip ${className}`.trim()}
       style={{ '--cube-depth': depth, ...style }}
-      aria-label={ariaLabel ?? resolvedText}
+      aria-label={resolvedAriaLabel}
     >
-      <span className="cube-flip__ghost" aria-hidden="true">
-        {frontText}
-      </span>
-      <span className="cube-flip__ghost" aria-hidden="true">
-        {backText}
-      </span>
-      <motion.span
+      <div className="cube-flip__ghost" aria-hidden="true">
+        {renderFront}
+      </div>
+      <div className="cube-flip__ghost" aria-hidden="true">
+        {renderBack}
+      </div>
+      <motion.div
         className="cube-flip__cube"
         initial={{ rotateX: 0, rotateY: 0 }}
         animate={controls}
       >
-        <span
+        <div
           className="cube-flip__face cube-flip__face--front"
           aria-hidden="true"
           style={{ transform: 'translateZ(var(--cube-depth))' }}
         >
-          {frontText}
-        </span>
-        <span
+          {renderFront}
+        </div>
+        <div
           className="cube-flip__face cube-flip__face--back"
           aria-hidden="true"
           style={{ transform: backFaceTransform }}
         >
-          {backText}
-        </span>
-      </motion.span>
-    </span>
+          {renderBack}
+        </div>
+      </motion.div>
+    </div>
   );
 };
 
-export default CubeFlipText;
+export { CubeFlipElement };
+export default CubeFlipElement;

@@ -2,6 +2,50 @@
 
 /* ... keep your :root and .app-container ... */
 
+
+.roboto-mono-title {
+  font-family: "Roboto Mono", monospace;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
+  font-size: 15rem;
+  margin: 0;
+  letter-spacing: 2rem;
+}
+
+.splash-start {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 220ms ease, letter-spacing 220ms ease, opacity 220ms ease;
+  will-change: transform, letter-spacing, opacity;
+}
+
+.splash-start:hover {
+  transform: translateY(-3px);
+  letter-spacing: 2.3rem;
+  opacity: 0.9;
+}
+
+.splash-start:focus-visible {
+  outline: 2px solid #121212;
+  outline-offset: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-start {
+    transition: none;
+  }
+
+  .splash-start:hover {
+    transform: none;
+    letter-spacing: 2rem;
+    opacity: 1;
+  }
+}
+
 body {
   display: flex;
   justify-content: center;
@@ -9,16 +53,13 @@ body {
   height: 100%;
 }
 .app-container {
-  min-height: 100vh;
+  min-height: 80vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 }
 
-h1 {
-  font-size: 10rem;
-}
 
 .piano {
   display: flex;

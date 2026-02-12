@@ -134,7 +134,7 @@ function App() {
                 isScaleMode={piano.isScaleMode}
                 currentScaleLabel={piano.currentScale.label}
                 onShiftScale={piano.shiftScale}
-            /> : null : <h1>PIANOER</h1>}
+            /> : null : null}
 
             {/* 3. CONDITIONAL CONTENT */}
             {!hasStarted ? (

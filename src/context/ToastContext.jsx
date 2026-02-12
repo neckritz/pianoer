@@ -12,7 +12,7 @@ export const ToastProvider = ({ children }) => {
     const lastContentByKeyRef = useRef(new Map());
     const toastsRef = useRef([]);
     const baseDuration = 1500;
-    const extendedDuration = 700;
+    const extendedDuration = 850;
 
     useEffect(() => {
         toastsRef.current = toasts;

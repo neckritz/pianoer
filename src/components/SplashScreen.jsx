@@ -4,11 +4,12 @@ const SplashScreen = ({ onStart }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <button
-        className="key white"
-        style={{ height: 'auto', width: 'auto', padding: '1rem 2rem' }}
+        type="button"
+        className="roboto-mono-title splash-start"
         onClick={onStart}
+        aria-label="Start Pianoer"
       >
-        ENTER STUDIO
+        PIANOER
       </button>
     </div>
   );
