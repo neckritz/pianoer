@@ -2,17 +2,22 @@ import React from 'react';
 import * as Tone from 'tone';
 import './index.css';
 import FlyInToast from './components/FlyInToast';
-import SettingsModal from './components/SettingsModal';
 import AppHeader from './components/AppHeader';
-import SplashScreen from './components/SplashScreen';
 import PianoKeyboard from './components/PianoKeyboard';
 import { usePianoEngine } from './hooks/usePianoEngine';
-import CubeFlipText from './components/CubeFlipText';
+import CubeFlipElement from './components/CubeFlipText';
 import { SCALE_PRESETS } from './components/notes';
+import BackgroundShapes from './components/BackgroundWaves.jsx';
 
 function App() {
-    const [hasStarted, setHasStarted] = React.useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+    const [hasAudioStarted, setHasAudioStarted] = React.useState(false);
+    const [isMenuOpen, setIsMenuOpen] = React.useState(true);
+    const [isTitleHovered, setIsTitleHovered] = React.useState(false);
+    const [uiSettings] = React.useState({
+        showNoteNames: false,
+        showModeToast: true,
+        showScaleToast: true,
+    });
 
     const scaleRoots = React.useMemo(() => {
         const seen = new Set();
@@ -57,7 +62,12 @@ function App() {
         return 'up';
     }, [getScaleQuality, scaleRoots]);
 
-    const piano = usePianoEngine({ hasStarted, getScaleToastDirection: getScaleFlipDirection });
+    const piano = usePianoEngine({
+        hasStarted: !isMenuOpen,
+        getScaleToastDirection: getScaleFlipDirection,
+        enableModeToast: uiSettings.showModeToast,
+        enableScaleToast: uiSettings.showScaleToast,
+    });
     const [scaleFlip, setScaleFlip] = React.useState(() => ({
         text: piano.currentScale?.label ?? '',
         direction: 'up',
@@ -86,16 +96,34 @@ function App() {
     }, [piano.currentScale, getScaleFlipDirection]);
 
     const handleStart = async () => {
-        await Tone.start();
-        console.log('Audio Ready');
-        setHasStarted(true);
+        if (!hasAudioStarted) {
+            await Tone.start();
+            console.log('Audio Ready');
+            setHasAudioStarted(true);
+        }
+        setIsMenuOpen(false);
     };
 
-    // Escape Key logic
+    const handleStartKeyDown = (event) => {
+        if (!isMenuOpen) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleStart();
+        }
+    };
+
+    React.useEffect(() => {
+        if (!isMenuOpen) {
+            setIsTitleHovered(false);
+        }
+    }, [isMenuOpen]);
+
+    // Escape Key logic: return to menu
     React.useEffect(() => {
         const handleGlobalKey = (e) => {
             if (e.key === 'Escape') {
-                setIsSettingsOpen((prev) => !prev);
+                setIsMenuOpen(true);
+                document.activeElement?.blur()
             }
         };
 
@@ -109,44 +137,68 @@ function App() {
     return (
         <div className="app-container">
             <FlyInToast />
-        
-
-            {/* 1. GLOBAL UI (Always loaded) */}
-            <SettingsModal
-                isOpen={isSettingsOpen}
-                onClose={() => setIsSettingsOpen(false)}
-                currentLayout={piano.layout}
-                onToggleLayout={piano.toggleLayout}
-            />
+            <BackgroundShapes isHidden={!isMenuOpen || isTitleHovered} />
 
             {/* 2. HEADER (Always visible) */}
-            {hasStarted ? false ? <AppHeader
-                onOpenSettings={() => setIsSettingsOpen(true)}
-                isDualLike={piano.isDualLike}
-                leftShift={piano.leftShift}
-                rightShift={piano.rightShift}
-                leftBounds={piano.leftBounds}
-                rightBounds={piano.rightBounds}
-                singleShiftBounds={piano.singleShiftBounds}
-                onChangeShift={piano.changeShift}
-                currentMode={piano.currentMode}
-                onShiftMode={piano.shiftMode}
-                isScaleMode={piano.isScaleMode}
-                currentScaleLabel={piano.currentScale.label}
-                onShiftScale={piano.shiftScale}
-            /> : null : null}
-
-            {/* 3. CONDITIONAL CONTENT */}
-            {!hasStarted ? (
-                <SplashScreen onStart={handleStart} />
-            ) : (
-                <PianoKeyboard
-                    pressedNotes={piano.pressedNotes}
-                    playableNotes={piano.playableNotes}
-                    onMouseDown={piano.handleMouseDown}
-                    onMouseUp={piano.handleMouseUp}
+            {false && (
+                <AppHeader
+                    onOpenSettings={() => setIsMenuOpen(true)}
+                    isDualLike={piano.isDualLike}
+                    leftShift={piano.leftShift}
+                    rightShift={piano.rightShift}
+                    leftBounds={piano.leftBounds}
+                    rightBounds={piano.rightBounds}
+                    singleShiftBounds={piano.singleShiftBounds}
+                    onChangeShift={piano.changeShift}
+                    currentMode={piano.currentMode}
+                    onShiftMode={piano.shiftMode}
+                    isScaleMode={piano.isScaleMode}
+                    currentScaleLabel={piano.currentScale.label}
+                    onShiftScale={piano.shiftScale}
                 />
             )}
+
+            {/* 3. MAIN CONTENT */}
+            <CubeFlipElement
+                isFlipped={!isMenuOpen}
+                direction="up"
+                duration={.8}
+                className="piano-flip"
+                depth= "100px"
+                front={(
+                    <div
+                        className="splash-start start-face"
+                        role="button"
+                        tabIndex={isMenuOpen ? 0 : -1}
+                        onClick={handleStart}
+                        onKeyDown={handleStartKeyDown}
+                        onMouseEnter={() => setIsTitleHovered(true)}
+                        onMouseLeave={() => setIsTitleHovered(false)}
+                        onFocus={() => setIsTitleHovered(true)}
+                        onBlur={() => setIsTitleHovered(false)}
+                        aria-label="Start Pianoer"
+                        aria-hidden={!isMenuOpen}
+                        style={{ pointerEvents: isMenuOpen ? 'auto' : 'none' }}
+                    >
+                        <h1 className="roboto-mono-title">PIANOER</h1>
+                    </div>
+                )}
+                back={(
+                    <div
+                        className="piano-face"
+                        aria-hidden={isMenuOpen}
+                        style={{ pointerEvents: isMenuOpen ? 'none' : 'auto' }}
+                    >
+                        <PianoKeyboard
+                            pressedNotes={piano.pressedNotes}
+                            playableNotes={piano.playableNotes}
+                            onMouseDown={piano.handleMouseDown}
+                            onMouseUp={piano.handleMouseUp}
+                            showNoteNames={uiSettings.showNoteNames}
+                        />
+                    </div>
+                )}
+            />
 
 
         </div>

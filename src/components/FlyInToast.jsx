@@ -43,7 +43,7 @@ const ToastCard = ({ toast, index, variants }) => {
             exit="exit"
             onAnimationComplete={handleAnimationComplete}
             style={{
-                backgroundColor: 'rgba(0,0,0,0.8)',
+                backgroundColor: '#311109e4',
                 color: '#fff',
                 width: '100%',
                 height: '100%',
@@ -82,6 +82,7 @@ const ToastCard = ({ toast, index, variants }) => {
                 }}
             >
                 <CubeFlipText
+                    duration = {0.5}
                     text={flipText}
                     direction={direction}
                     ariaLabel={contentText}

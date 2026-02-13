@@ -17,7 +17,12 @@ import { noteToPitchClass } from '../components/utils';
 const MINOR_KEY_SHIFT_STEP = 2; // jump by white keys
 const MAJOR_KEY_SHIFT_STEP = 3; // jump by white keys
 
-export const usePianoEngine = ({ hasStarted, getScaleToastDirection } = {}) => {
+export const usePianoEngine = ({
+    hasStarted,
+    getScaleToastDirection,
+    enableModeToast = true,
+    enableScaleToast = true,
+} = {}) => {
     const [pressedNotes, setPressedNotes] = React.useState([]);
     const [layout, setLayout] = React.useState('QWERTZ');
     const [leftShift, setLeftShift] = React.useState(0);
@@ -61,12 +66,14 @@ export const usePianoEngine = ({ hasStarted, getScaleToastDirection } = {}) => {
             : 'up';
         scaleIndexRef.current = nextIndex;
         setScaleIndex(nextIndex);
-        showToast("SCALE", `${nextScale.label}`, {
-            direction,
-            fromContent: prevScale?.label,
-            key: 'scale'
-        });
-    }, [showToast, getScaleToastDirection]);
+        if (enableScaleToast) {
+            showToast("SCALE", `${nextScale.label}`, {
+                direction,
+                fromContent: prevScale?.label,
+                key: 'scale'
+            });
+        }
+    }, [showToast, getScaleToastDirection, enableScaleToast]);
     const getScaleIndexFor = React.useCallback((root, quality) => {
         if (!root) return null;
         const normalizedRoot = `${root}`.toUpperCase();
@@ -330,13 +337,25 @@ export const usePianoEngine = ({ hasStarted, getScaleToastDirection } = {}) => {
         updatePressedNotes();
     }, [updatePressedNotes]);
 
-    const shiftMode = React.useCallback((shift) => {
+    const shiftMode = React.useCallback((shift, options = {}) => {
+        const previousMode = PLAY_MODES[modeIndexRef.current];
         const next = (modeIndexRef.current + shift + PLAY_MODES.length) % PLAY_MODES.length;
         modeIndexRef.current = next;
         setModeIndex(next);
-        showToast("MODE", `${PLAY_MODES[next]}`, { key: 'mode' });
+        const direction = typeof options?.direction === 'string'
+            ? options.direction
+            : shift < 0
+                ? 'up'
+                : 'down';
+        if (enableModeToast) {
+            showToast("MODE", `${PLAY_MODES[next]}`, {
+                key: 'mode',
+                direction,
+                fromContent: previousMode,
+            });
+        }
         console.log(`Mode shift: ${shift}`);
-    }, [showToast]);
+    }, [showToast, enableModeToast]);
 
     const shiftScale = React.useCallback((delta) => {
         if (!scaleRoots.length) return;

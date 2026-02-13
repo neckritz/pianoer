@@ -1,7 +1,17 @@
 import React from 'react'
 import '../index.css'
 
-const Key = ({ note, type, isPressed, isPlayableLeft, isPlayableRight, onMouseDown, onMouseUp, onMouseLeave }) => {
+const Key = ({
+  note,
+  type,
+  isPressed,
+  isPlayableLeft,
+  isPlayableRight,
+  onMouseDown,
+  onMouseUp,
+  onMouseLeave,
+  showNoteNames = true,
+}) => {
   const isPlayable = isPlayableLeft || isPlayableRight;
   const playableClass = isPlayableLeft && isPlayableRight
     ? 'playable-both'
@@ -10,6 +20,7 @@ const Key = ({ note, type, isPressed, isPlayableLeft, isPlayableRight, onMouseDo
       : isPlayableRight
         ? 'playable-right'
         : '';
+  const showLabel = showNoteNames && type === "white";
 
   return (
     <button
@@ -18,7 +29,7 @@ const Key = ({ note, type, isPressed, isPlayableLeft, isPlayableRight, onMouseDo
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseLeave}
     >
-        <span className="key-text">{type==="black"?null:note}</span>
+        <span className="key-text">{showLabel ? note : null}</span>
     </button>
   )
 }

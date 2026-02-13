@@ -2,7 +2,13 @@ import React from 'react';
 import Key from './Key';
 import { NOTES } from './notes';
 
-const PianoKeyboard = ({ pressedNotes, playableNotes, onMouseDown, onMouseUp }) => {
+const PianoKeyboard = ({
+  pressedNotes,
+  playableNotes,
+  onMouseDown,
+  onMouseUp,
+  showNoteNames = true,
+}) => {
   return (
     <div className="piano">
       {NOTES.map(({ note, type }) => (
@@ -16,6 +22,7 @@ const PianoKeyboard = ({ pressedNotes, playableNotes, onMouseDown, onMouseUp }) 
           onMouseDown={() => onMouseDown(note)}
           onMouseUp={() => onMouseUp(note)}
           onMouseLeave={() => onMouseUp(note)}
+          showNoteNames={showNoteNames}
         />
       ))}
     </div>

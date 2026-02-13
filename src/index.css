@@ -2,15 +2,22 @@
 
 /* ... keep your :root and .app-container ... */
 
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
 
 .roboto-mono-title {
   font-family: "Roboto Mono", monospace;
   font-optical-sizing: auto;
-  font-weight: 300;
+  color: #2d0b03;
+  font-weight: 200;
   font-style: normal;
-  font-size: 15rem;
+  font-size: clamp(3rem, 8vw, 8rem);
   margin: 0;
-  letter-spacing: 2rem;
+  letter-spacing: clamp(2.9rem, 3vw, 5.8rem);
+  transition: letter-spacing 220ms ease;
 }
 
 .splash-start {
@@ -19,19 +26,30 @@
   padding: 0;
   color: inherit;
   cursor: pointer;
-  transition: transform 220ms ease, letter-spacing 220ms ease, opacity 220ms ease;
-  will-change: transform, letter-spacing, opacity;
+  transition: transform 220ms ease, opacity 220ms ease;
+  will-change: transform, opacity;
 }
 
 .splash-start:hover {
   transform: translateY(-3px);
-  letter-spacing: 2.3rem;
   opacity: 0.9;
+}
+
+.splash-start:hover .roboto-mono-title {
+  letter-spacing: clamp(6.4rem, 4.5vw, 8.8rem);
 }
 
 .splash-start:focus-visible {
   outline: 2px solid #121212;
   outline-offset: 6px;
+}
+
+
+.start-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -53,19 +71,74 @@ body {
   height: 100%;
 }
 .app-container {
-  min-height: 80vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 }
 
+.background-waves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  background-color: #F1F1D9;
+}
+
+.background-waves svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wave {
+  transform: translate(0, 0);
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 1;
+  transition: transform 1200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 800ms ease;
+}
+
+.background-waves.is-hidden .wave--top-left {
+  transform: translate(-22vw, -22vh);
+  opacity: 0;
+}
+
+.background-waves.is-hidden .wave--top-right {
+  transform: translate(22vw, -22vh);
+  opacity: 0;
+}
+
+.background-waves.is-hidden .wave--bottom-left {
+  transform: translate(-22vw, 22vh);
+  opacity: 0;
+}
+
+.background-waves.is-hidden .wave--bottom-right {
+  transform: translate(22vw, 22vh);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave {
+    transition: none;
+  }
+}
+
 
 .piano {
+  --white-width: clamp(1.2rem, 2.4vw, 2rem);
+  --white-height: clamp(6rem, 10vw, 9.5rem);
+  --black-width: clamp(0.7rem, 1.4vw, 1.1rem);
+  --black-height: clamp(4rem, 7vw, 6.5rem);
   display: flex;
   justify-content: center;
   /* Brutalist aesthetic: distinct borders, high contrast */
-  padding: 2rem 1rem;
+  padding: clamp(0.75rem, 2vw, 2rem) clamp(0.5rem, 2vw, 1rem);
 }
 
 .key {
@@ -78,7 +151,7 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-bottom: 1rem;
+  padding-bottom: clamp(0.4rem, 1vw, 1rem);
   font-weight: 700;
   transition: transform 0.1s, background-color 0.1s; /* Smooth transitions */
 }
@@ -98,19 +171,20 @@ body {
 
 .key.playable-left {
   /* box-shadow: inset 0 0 0 2px #4da3ff; */
-  outline: 0.5px solid #4da3ff;
-  background-color: #f4f9ff;
+  border: 1.2px solid #895a4c;
+  background-color: #fff4ea;
 }
 
 .key.playable-right {
 
-  outline: 0.5px solid #ff8c4d;
-  background-color: #fff9f6;
+  border: 1.2px solid #d3872f;
+  background-color: #fff6ea;
 }
 
 .key.playable-both {
   /* box-shadow: inset 0 0 0 2px #9b9b9b; */
-  outline: 0.5px solid #9b9b9b;
+  border: 1.2px solid #787574;
+  background-color: rgb(255, 250, 243);
 }
 
 .key.playable.pressed {
@@ -128,56 +202,65 @@ body {
 }
 
 .white.playable-left.pressed {
-  background-color: #d9e0e8;
+  background-color: #f1ddc8;
 }
 
 .white.playable-right.pressed {
-  background-color: #e9ded8;
+  background-color: #f3e8d6;
 }
 
 .black.playable-left.pressed {
-  background-color: #d9e0e8;
+  background-color: #f1ddc8;
 }
 
 .black.playable-right.pressed {
-  background-color: #e9ded8;
-} 
+  background-color: #f3e8d6;
+}
+
+.white.playable-both.pressed {
+  background-color: #efe3d8;
+}
+
+.black.playable-both.pressed {
+  background-color: #efe3d8;
+}
+
+
 .title {
   font-size: 2.5rem;
   font-weight: 900;
-  color: black;
   margin-bottom: 1rem;
   user-select: none;
 }
   
 .white {
-  background-color: #fafafa;
+  background-color: #fffbf1;
   color: #121212;
-  width: 2rem; /* Standardize white key width */
-  height: 9.5rem;
+  width: var(--white-width); /* Standardize white key width */
+  height: var(--white-height);
   z-index: 1;
   margin: 0 -0.5px; /* Overlap borders to remove seams at E-F / B-C gaps */
 }
-
+ 
 .white:active, .white.pressed {
-  background-color: #dcdcdc;
+  background-color: #e9e4dc;
 }
   
 .black {
-  background-color: #121212;
+  background-color: #1f1001;
   color: #f0f0f0;
   border: #000000;
-  width: 1.1rem; /* Narrower to leave space for scaled whites */
-  height: 6.5rem;
+  width: var(--black-width); /* Narrower to leave space for scaled whites */
+  height: var(--black-height);
   z-index: 30; /* Must be higher than white keys */
   
   /* THE MAGIC: Pull neighbors underneath */
-  margin-left: -0.55rem; /* Half the width of the black key */
-  margin-right: -0.55rem;
+  margin-left: calc(-0.5 * var(--black-width)); /* Half the width of the black key */
+  margin-right: calc(-0.5 * var(--black-width));
 }
 
 .black:active, .black.pressed {
-  background-color: #333;
+  background-color: #2b221f;
   z-index: 40;
 }
 
@@ -193,6 +276,14 @@ body {
   perspective: 800px;
   perspective-origin: center;
   cursor: pointer;
+}
+
+.key-text {
+  color: #301102;
+}
+
+.piano-flip {
+  perspective: 8000px;
 }
 
 .cube-flip__ghost {
@@ -215,15 +306,19 @@ body {
   line-height: 1;
 }
 
+
+
 .cube-flip__face {
   grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   backface-visibility: hidden;
-  transform-style: preserve-3d;
+  transform-style: flat;
   padding: 0.02em 0.08em;
+  transition: opacity 120ms ease;
 }
+
 
   /* The Backdrop (optional, darkens the piano when settings are open) */
 .settings-overlay {
