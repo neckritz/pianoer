@@ -1,9 +1,5 @@
-import React, { createContext, useState, useContext, useCallback, useRef, useEffect } from 'react';
-
-const ToastContext = createContext();
-
-// Custom hook for easy access to the toast trigger
-export const useToast = () => useContext(ToastContext);
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { ToastContext } from './ToastContextValue';
 
 export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]); // [{ header, content, fromContent, direction, id }]
@@ -19,9 +15,10 @@ export const ToastProvider = ({ children }) => {
     }, [toasts]);
 
     useEffect(() => {
+        const timers = timersRef.current;
         return () => {
-            timersRef.current.forEach((timerId) => clearTimeout(timerId));
-            timersRef.current.clear();
+            timers.forEach((timerId) => clearTimeout(timerId));
+            timers.clear();
         };
     }, []);
 

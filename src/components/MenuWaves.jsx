@@ -1,8 +1,8 @@
 import React from 'react';
 
-const BackgroundShapes = ({ isHidden }) => {
+const MenuWaves = ({ isHidden }) => {
   return (
-    <div className={`background-waves ${isHidden ? 'is-hidden' : ''}`}>
+    <div className={`menu-waves ${isHidden ? 'is-hidden' : ''}`}>
       <svg 
         width="100%" 
         height="100%" 
@@ -39,4 +39,4 @@ const BackgroundShapes = ({ isHidden }) => {
   );
 };
 
-export default BackgroundShapes;
+export default MenuWaves;

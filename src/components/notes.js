@@ -126,16 +126,16 @@ export const SHIFT_KEY_BINDINGS = {
 
 export const NAV_KEY_BINDINGS = {
     mode: {
+        next: "",
+        prev: "",
+    },
+    root: {
         next: "2",
         prev: "1",
     },
-    root: {
-        next: "4",
-        prev: "3",
-    },
     quality: {
-        major: "6",
-        minor: "5",
+        major: "3",
+        minor: "4",
     }
 
 };

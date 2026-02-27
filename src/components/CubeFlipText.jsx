@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion, useAnimation } from 'framer-motion';
 
+const MotionDiv = motion.div;
+
 const CubeFlipElement = ({
   text,
   initialText,
@@ -153,7 +155,7 @@ const CubeFlipElement = ({
       <div className="cube-flip__ghost" aria-hidden="true">
         {renderBack}
       </div>
-      <motion.div
+      <MotionDiv
         className="cube-flip__cube"
         initial={{
           rotateX: axis === 'X' ? initialRotation : 0,
@@ -175,7 +177,7 @@ const CubeFlipElement = ({
         >
           {renderBack}
         </div>
-      </motion.div>
+      </MotionDiv>
     </div>
   );
 };

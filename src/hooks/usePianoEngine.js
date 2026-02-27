@@ -11,11 +11,18 @@ import {
     PLAY_MODES,
 } from '../components/notes';
 import { startTone, stopTone, stopAllTones } from '../audio';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../context/useToast';
 import { noteToPitchClass } from '../components/utils';
 
 const MINOR_KEY_SHIFT_STEP = 2; // jump by white keys
 const MAJOR_KEY_SHIFT_STEP = 3; // jump by white keys
+const FEEL_WINDOW_MS = 4000;
+const FEEL_RANGES = {
+    low: { min: 21, max: 60 },   // A0 - C4 (wider)
+    mid: { min: 36, max: 84 },   // C2 - C6 (wider overlap across range)
+    high: { min: 64, max: 108 }, // E4 - C8 (wider)
+};
+const FEEL_GAIN = 1.15; // Slight global boost to feel intensity
 
 export const usePianoEngine = ({
     hasStarted,
@@ -24,11 +31,16 @@ export const usePianoEngine = ({
     enableScaleToast = true,
 } = {}) => {
     const [pressedNotes, setPressedNotes] = React.useState([]);
-    const [layout, setLayout] = React.useState('QWERTZ');
-    const [leftShift, setLeftShift] = React.useState(0);
-    const [rightShift, setRightShift] = React.useState(0);
+    const [layout, setLayout] = React.useState('QWERTY');
+    const [leftShift, setLeftShift] = React.useState(-10);
+    const [rightShift, setRightShift] = React.useState(10);
     const activeKeyMap = React.useRef({});
-    const [modeIndex, setModeIndex] = React.useState(0);
+    const [pressedInputKeys, setPressedInputKeys] = React.useState([]);
+    const pressedInputKeysRef = React.useRef(new Set());
+    const [modeIndex, setModeIndex] = React.useState(() => {
+        const scaleModeIndex = PLAY_MODES.indexOf('SCALE');
+        return scaleModeIndex === -1 ? 0 : scaleModeIndex;
+    });
     const currentMode = PLAY_MODES[modeIndex];
     const modeIndexRef = React.useRef(modeIndex);
     const isDual = currentMode === 'DUAL';
@@ -37,6 +49,16 @@ export const usePianoEngine = ({
     const currentScale = SCALE_PRESETS[scaleIndex];
     const scaleIndexRef = React.useRef(scaleIndex);
     const { showToast } = useToast();
+    const [playFeel, setPlayFeel] = React.useState({
+        low: 0,
+        mid: 0,
+        high: 0,
+    });
+    const playFeelRef = React.useRef({
+        low: [],
+        mid: [],
+        high: [],
+    });
     const scaleRoots = React.useMemo(() => {
         const seen = new Set();
         return SCALE_PRESETS.reduce((acc, preset) => {
@@ -55,6 +77,88 @@ export const usePianoEngine = ({
         if (label.endsWith('m')) return 'minor';
         return 'major';
     }, []);
+    const noteToMidi = React.useCallback((noteString) => {
+        const match = noteString.match(/^([A-G])(#?)(\d)$/);
+        if (!match) return null;
+        const [, letter, sharp, octaveRaw] = match;
+        const base = {
+            C: 0,
+            D: 2,
+            E: 4,
+            F: 5,
+            G: 7,
+            A: 9,
+            B: 11,
+        }[letter];
+        const octave = Number(octaveRaw);
+        if (!Number.isFinite(octave)) return null;
+        const accidental = sharp ? 1 : 0;
+        return (octave + 1) * 12 + base + accidental;
+    }, []);
+    const computePlayFeel = React.useCallback((now) => {
+        const cutoff = now - FEEL_WINDOW_MS;
+        const buckets = playFeelRef.current;
+        const prune = (arr) => {
+            let idx = 0;
+            while (idx < arr.length && arr[idx].t < cutoff) idx += 1;
+            if (idx > 0) arr.splice(0, idx);
+        };
+        prune(buckets.low);
+        prune(buckets.mid);
+        prune(buckets.high);
+
+        const windowSeconds = FEEL_WINDOW_MS / 1000;
+        const sumWeights = (arr) => arr.reduce((sum, item) => sum + item.w, 0);
+        return {
+            low: (sumWeights(buckets.low) / windowSeconds) * FEEL_GAIN,
+            mid: (sumWeights(buckets.mid) / windowSeconds) * FEEL_GAIN,
+            high: (sumWeights(buckets.high) / windowSeconds) * FEEL_GAIN,
+        };
+    }, []);
+
+    const applyPlayFeel = React.useCallback((nextFeel, shouldLog = false) => {
+        setPlayFeel((prev) => {
+            if (!prev) return nextFeel;
+            const same = Math.abs(prev.low - nextFeel.low) < 0.001
+                && Math.abs(prev.mid - nextFeel.mid) < 0.001
+                && Math.abs(prev.high - nextFeel.high) < 0.001;
+            return same ? prev : nextFeel;
+        });
+        if (shouldLog) {
+            console.log('play-feel (notes/sec)', {
+                low: Number(nextFeel.low.toFixed(2)),
+                mid: Number(nextFeel.mid.toFixed(2)),
+                high: Number(nextFeel.high.toFixed(2)),
+            });
+        }
+    }, []);
+
+    const updatePlayFeel = React.useCallback((noteName) => {
+        const midi = noteToMidi(noteName);
+        if (midi == null) return;
+        const now = Date.now();
+        const buckets = playFeelRef.current;
+        const lerp = (from, to, t) => from + (to - from) * t;
+        const addIfInRange = (range, target, weight = 1) => {
+            if (midi >= range.min && midi <= range.max) {
+                target.push({ t: now, w: weight });
+            }
+        };
+        if (midi >= FEEL_RANGES.low.min && midi <= FEEL_RANGES.low.max) {
+            const t = (midi - FEEL_RANGES.low.min) / (FEEL_RANGES.low.max - FEEL_RANGES.low.min || 1);
+            const weight = lerp(1.5, 0.5, Math.min(Math.max(t, 0), 1));
+            addIfInRange(FEEL_RANGES.low, buckets.low, weight);
+        }
+        addIfInRange(FEEL_RANGES.mid, buckets.mid, 1);
+        if (midi >= FEEL_RANGES.high.min && midi <= FEEL_RANGES.high.max) {
+            const t = (midi - FEEL_RANGES.high.min) / (FEEL_RANGES.high.max - FEEL_RANGES.high.min || 1);
+            const weight = lerp(0.5, 1.5, Math.min(Math.max(t, 0), 1));
+            addIfInRange(FEEL_RANGES.high, buckets.high, weight);
+        }
+
+        const nextFeel = computePlayFeel(now);
+        applyPlayFeel(nextFeel, true);
+    }, [noteToMidi, computePlayFeel, applyPlayFeel]);
     const applyScaleIndex = React.useCallback((nextIndex) => {
         if (!Number.isInteger(nextIndex)) return;
         if (nextIndex < 0 || nextIndex >= SCALE_PRESETS.length) return;
@@ -99,6 +203,16 @@ export const usePianoEngine = ({
         if (nextIndex === null) return;
         applyScaleIndex(nextIndex);
     }, [applyScaleIndex, getScaleIndexFor]);
+    const shiftScaleQuality = React.useCallback((delta) => {
+        const currentScale = SCALE_PRESETS[scaleIndexRef.current];
+        if (!currentScale) return;
+        const currentQuality = getScaleQuality(currentScale);
+        const qualities = ['major', 'minor'];
+        const currentIndex = qualities.indexOf(currentQuality);
+        const step = delta >= 0 ? 1 : -1;
+        const nextQuality = qualities[(currentIndex + step + qualities.length) % qualities.length];
+        setScaleQuality(nextQuality);
+    }, [getScaleQuality, setScaleQuality]);
 
     // Precompute indices of white keys so shifts use white positions instead of raw semitones
     const whiteNoteIndices = React.useMemo(
@@ -366,6 +480,41 @@ export const usePianoEngine = ({
         setScaleRoot(nextRoot);
     }, [scaleRoots, setScaleRoot]);
 
+    const normalizeInputKey = React.useCallback((rawKey) => {
+        if (typeof rawKey !== 'string') return null;
+        const normalized = rawKey.toLowerCase();
+        return normalized || null;
+    }, []);
+
+    const addPressedInputKey = React.useCallback((rawKey) => {
+        const key = normalizeInputKey(rawKey);
+        if (!key) return { key: null, isNew: false };
+        const activeKeys = pressedInputKeysRef.current;
+        const isNew = !activeKeys.has(key);
+        if (isNew) {
+            activeKeys.add(key);
+            setPressedInputKeys(Array.from(activeKeys));
+        }
+        return { key, isNew };
+    }, [normalizeInputKey]);
+
+    const removePressedInputKey = React.useCallback((rawKey) => {
+        const key = normalizeInputKey(rawKey);
+        if (!key) return null;
+        const activeKeys = pressedInputKeysRef.current;
+        if (activeKeys.has(key)) {
+            activeKeys.delete(key);
+            setPressedInputKeys(Array.from(activeKeys));
+        }
+        return key;
+    }, [normalizeInputKey]);
+
+    const resetPressedInputKeys = React.useCallback(() => {
+        if (!pressedInputKeysRef.current.size) return;
+        pressedInputKeysRef.current.clear();
+        setPressedInputKeys([]);
+    }, []);
+
     // MASTER FUNCTION: Starts a note
     // identifier: A unique ID for the source (e.g., keyboard key "a" or mouse "click-C4")
     // noteName: The resolved note (e.g., "C4")
@@ -375,7 +524,8 @@ export const usePianoEngine = ({
         activeKeyMap.current[identifier] = { note: noteName, hand };
         startTone(noteName);
         updatePressedNotes();
-    }, [updatePressedNotes]);
+        updatePlayFeel(noteName);
+    }, [updatePressedNotes, updatePlayFeel]);
 
     // MASTER FUNCTION: Stops a note
     const triggerNoteStop = React.useCallback((identifier) => {
@@ -388,174 +538,209 @@ export const usePianoEngine = ({
         updatePressedNotes();
     }, [updatePressedNotes]);
 
+    const handleInputKeyDown = React.useCallback((key) => {
+        if (!key) return;
+
+        if (isScaleMode) {
+            if (navBindings.qualityMajor && key === navBindings.qualityMajor) {
+                shiftScaleQuality(1);
+                return;
+            }
+            if (navBindings.qualityMinor && key === navBindings.qualityMinor) {
+                shiftScaleQuality(-1);
+                return;
+            }
+            if (navBindings.rootByKey?.[key]) {
+                setScaleRoot(navBindings.rootByKey[key]);
+                return;
+            }
+            if (navBindings.rootNext && key === navBindings.rootNext) {
+                shiftScale(1);
+                return;
+            }
+            if (navBindings.rootPrev && key === navBindings.rootPrev) {
+                shiftScale(-1);
+                return;
+            }
+        }
+
+        const matchShiftKey = (bindings, hand) => {
+            if (bindings?.minor_upshift_key && key === bindings.minor_upshift_key.toLowerCase()) {
+                changeShift(hand, MINOR_KEY_SHIFT_STEP);
+                return true;
+            }
+            if (bindings?.minor_downshift_key && key === bindings.minor_downshift_key.toLowerCase()) {
+                changeShift(hand, -MINOR_KEY_SHIFT_STEP);
+                return true;
+            }
+            if (bindings?.major_upshift_key && key === bindings.major_upshift_key.toLowerCase()) {
+                changeShift(hand, MAJOR_KEY_SHIFT_STEP);
+                return true;
+            }
+            if (bindings?.major_downshift_key && key === bindings.major_downshift_key.toLowerCase()) {
+                changeShift(hand, -MAJOR_KEY_SHIFT_STEP);
+                return true;
+            }
+            return false;
+        };
+
+        if (isScaleMode) {
+            if (matchShiftKey(shiftBindings.left, 'left')) return;
+            if (matchShiftKey(shiftBindings.right, 'right')) return;
+        } else if (isDual) {
+            if (matchShiftKey(shiftBindings.left, 'left')) return;
+            if (matchShiftKey(shiftBindings.right, 'right')) return;
+        } else if (matchShiftKey(shiftBindings.left, 'left')) {
+            return;
+        }
+
+        // Mode switching
+        if (navBindings.modeNext && key === navBindings.modeNext) {
+            shiftMode(1);
+            return;
+        }
+        if (navBindings.modePrev && key === navBindings.modePrev) {
+            shiftMode(-1);
+            return;
+        }
+
+        const resolveHandBinding = (handLayout, shift, hand) => {
+            const whiteBinding = (handLayout.white || []).find(({ key: bindingKey }) => bindingKey === key);
+            if (whiteBinding && typeof whiteBinding.whiteOffset === 'number') {
+                const note = resolveWhiteNote(whiteBinding.whiteOffset, shift);
+                if (note) return { note: note.note, hand };
+            }
+            const blackBinding = (handLayout.black || []).find(({ key: bindingKey }) => bindingKey === key);
+            if (blackBinding && typeof blackBinding.afterWhiteOffset === 'number') {
+                const note = resolveBlackNote(blackBinding.afterWhiteOffset, shift);
+                if (note) return { note: note.note, hand };
+            }
+            return null;
+        };
+
+        const resolveScaleBinding = (handLayout, shift, hand) => {
+            const degreeBinding = (handLayout.degrees || []).find(({ key: bindingKey }) => bindingKey === key);
+            if (degreeBinding && typeof degreeBinding.degreeOffset === 'number') {
+                const note = resolveScaleNote(degreeBinding.degreeOffset, shift);
+                if (note) return { note: note.note, hand };
+            }
+            return null;
+        };
+
+        if (isScaleMode) {
+            const leftMatch = resolveScaleBinding(scaleLayout.left || {}, leftShift, 'left');
+            if (leftMatch) {
+                triggerNoteStart(key, leftMatch.note, leftMatch.hand);
+                return;
+            }
+            const rightMatch = resolveScaleBinding(scaleLayout.right || {}, rightShift, 'right');
+            if (rightMatch) {
+                triggerNoteStart(key, rightMatch.note, rightMatch.hand);
+                return;
+            }
+        } else if (isDual) {
+            const leftMatch = resolveHandBinding(dualLayout.left || {}, leftShift, 'left');
+            if (leftMatch) {
+                triggerNoteStart(key, leftMatch.note, leftMatch.hand);
+                return;
+            }
+            const rightMatch = resolveHandBinding(dualLayout.right || {}, rightShift, 'right');
+            if (rightMatch) {
+                triggerNoteStart(key, rightMatch.note, rightMatch.hand);
+                return;
+            }
+        } else {
+            const singleMatch = resolveHandBinding(singleLayout, leftShift, 'left');
+            if (singleMatch) {
+                triggerNoteStart(key, singleMatch.note, singleMatch.hand);
+            }
+        }
+    }, [
+        isScaleMode,
+        navBindings,
+        shiftScaleQuality,
+        setScaleRoot,
+        shiftScale,
+        changeShift,
+        shiftBindings,
+        isDual,
+        shiftMode,
+        resolveWhiteNote,
+        resolveBlackNote,
+        resolveScaleNote,
+        scaleLayout,
+        leftShift,
+        rightShift,
+        triggerNoteStart,
+        dualLayout,
+        singleLayout,
+    ]);
+
+    const triggerInputDown = React.useCallback((rawKey) => {
+        if (!hasStarted) return;
+        const { key, isNew } = addPressedInputKey(rawKey);
+        if (!key || !isNew) return;
+        handleInputKeyDown(key);
+    }, [hasStarted, addPressedInputKey, handleInputKeyDown]);
+
+    const triggerInputUp = React.useCallback((rawKey) => {
+        const key = removePressedInputKey(rawKey);
+        if (!key) return;
+        if (activeKeyMap.current[key]) {
+            triggerNoteStop(key);
+        }
+    }, [removePressedInputKey, triggerNoteStop]);
+
     // Keyboard logic
     React.useEffect(() => {
-        if (!hasStarted) return;
-        const currentSingleLayout = singleLayout;
-        const currentDualLayout = dualLayout;
-        const currentScaleLayout = scaleLayout;
-
         const handleKeyDown = (e) => {
             if (e.repeat) return;
-
-            const key = e.key.toLowerCase();
-
-            if (isScaleMode) {
-                if (navBindings.qualityMajor && key === navBindings.qualityMajor) {
-                    setScaleQuality('major');
-                    return;
-                }
-                if (navBindings.qualityMinor && key === navBindings.qualityMinor) {
-                    setScaleQuality('minor');
-                    return;
-                }
-                if (navBindings.rootByKey?.[key]) {
-                    setScaleRoot(navBindings.rootByKey[key]);
-                    return;
-                }
-                if (navBindings.rootNext && key === navBindings.rootNext) {
-                    shiftScale(1);
-                    return;
-                }
-                if (navBindings.rootPrev && key === navBindings.rootPrev) {
-                    shiftScale(-1);
-                    return;
-                }
-            }
-
-            const matchShiftKey = (bindings, hand) => {
-                if (bindings?.minor_upshift_key && key === bindings.minor_upshift_key.toLowerCase()) {
-                    changeShift(hand, MINOR_KEY_SHIFT_STEP);
-                    return true;
-                }
-                if (bindings?.minor_downshift_key && key === bindings.minor_downshift_key.toLowerCase()) {
-                    changeShift(hand, -MINOR_KEY_SHIFT_STEP);
-                    return true;
-                }
-                if (bindings?.major_upshift_key && key === bindings.major_upshift_key.toLowerCase()) {
-                    changeShift(hand, MAJOR_KEY_SHIFT_STEP);
-                    return true;
-                }
-                if (bindings?.major_downshift_key && key === bindings.major_downshift_key.toLowerCase()) {
-                    changeShift(hand, -MAJOR_KEY_SHIFT_STEP);
-                    return true;
-                }
-                return false;
-            };
-
-            if (isScaleMode) {
-                if (matchShiftKey(shiftBindings.left, 'left')) return;
-                if (matchShiftKey(shiftBindings.right, 'right')) return;
-            } else if (isDual) {
-                if (matchShiftKey(shiftBindings.left, 'left')) return;
-                if (matchShiftKey(shiftBindings.right, 'right')) return;
-            } else if (matchShiftKey(shiftBindings.left, 'left')) {
-                return;
-            }
-
-            // Mode switching
-            if (navBindings.modeNext && key === navBindings.modeNext) {
-                shiftMode(1);
-                return;
-            }
-            if (navBindings.modePrev && key === navBindings.modePrev) {
-                shiftMode(-1);
-                return;
-            }
-
-            const resolveHandBinding = (handLayout, shift, hand) => {
-                const whiteBinding = (handLayout.white || []).find(({ key: bindingKey }) => bindingKey === key);
-                if (whiteBinding && typeof whiteBinding.whiteOffset === 'number') {
-                    const note = resolveWhiteNote(whiteBinding.whiteOffset, shift);
-                    if (note) return { note: note.note, hand };
-                }
-                const blackBinding = (handLayout.black || []).find(({ key: bindingKey }) => bindingKey === key);
-                if (blackBinding && typeof blackBinding.afterWhiteOffset === 'number') {
-                    const note = resolveBlackNote(blackBinding.afterWhiteOffset, shift);
-                    if (note) return { note: note.note, hand };
-                }
-                return null;
-            };
-
-            const resolveScaleBinding = (handLayout, shift, hand) => {
-                const degreeBinding = (handLayout.degrees || []).find(({ key: bindingKey }) => bindingKey === key);
-                if (degreeBinding && typeof degreeBinding.degreeOffset === 'number') {
-                    const note = resolveScaleNote(degreeBinding.degreeOffset, shift);
-                    if (note) return { note: note.note, hand };
-                }
-                return null;
-            };
-
-            if (isScaleMode) {
-                const leftMatch = resolveScaleBinding(currentScaleLayout.left || {}, leftShift, 'left');
-                if (leftMatch) {
-                    triggerNoteStart(key, leftMatch.note, leftMatch.hand);
-                    return;
-                }
-                const rightMatch = resolveScaleBinding(currentScaleLayout.right || {}, rightShift, 'right');
-                if (rightMatch) {
-                    triggerNoteStart(key, rightMatch.note, rightMatch.hand);
-                    return;
-                }
-            } else if (isDual) {
-                const leftMatch = resolveHandBinding(currentDualLayout.left || {}, leftShift, 'left');
-                if (leftMatch) {
-                    triggerNoteStart(key, leftMatch.note, leftMatch.hand);
-                    return;
-                }
-                const rightMatch = resolveHandBinding(currentDualLayout.right || {}, rightShift, 'right');
-                if (rightMatch) {
-                    triggerNoteStart(key, rightMatch.note, rightMatch.hand);
-                    return;
-                }
-            } else {
-                const singleMatch = resolveHandBinding(currentSingleLayout, leftShift, 'left');
-                if (singleMatch) {
-                    triggerNoteStart(key, singleMatch.note, singleMatch.hand);
-                }
-            }
+            triggerInputDown(e.key);
         };
 
         const handleKeyUp = (e) => {
-            const key = e.key.toLowerCase();
-            if (activeKeyMap.current[key]) {
-                triggerNoteStop(key);
-            }
+            triggerInputUp(e.key);
+        };
+
+        const handleWindowBlur = () => {
+            stopAllPlaying();
+            resetPressedInputKeys();
         };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('blur', handleWindowBlur);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('blur', handleWindowBlur);
         };
     }, [
-        hasStarted,
-        isDual,
-        isScaleMode,
-        singleLayout,
-        dualLayout,
-        scaleLayout,
-        shiftBindings,
-        leftShift,
-        rightShift,
-        changeShift,
-        resolveWhiteNote,
-        resolveBlackNote,
-        resolveScaleNote,
-        triggerNoteStart,
-        triggerNoteStop,
-        shiftMode,
-        shiftScale,
-        setScaleRoot,
-        setScaleQuality,
-        navBindings,
+        triggerInputDown,
+        triggerInputUp,
+        stopAllPlaying,
+        resetPressedInputKeys,
     ]);
 
     React.useEffect(() => {
         stopAllPlaying();
     }, [currentMode, stopAllPlaying]);
+
+    React.useEffect(() => {
+        if (!hasStarted) {
+            setPlayFeel({ low: 0, mid: 0, high: 0 });
+            resetPressedInputKeys();
+            return undefined;
+        }
+
+        const intervalId = setInterval(() => {
+            const nextFeel = computePlayFeel(Date.now());
+            applyPlayFeel(nextFeel, false);
+        }, 60);
+
+        return () => clearInterval(intervalId);
+    }, [hasStarted, computePlayFeel, applyPlayFeel, resetPressedInputKeys]);
 
     React.useEffect(() => {
         if (isScaleMode) {
@@ -582,6 +767,11 @@ export const usePianoEngine = ({
         setLayout((prev) => prev === 'QWERTY' ? 'QWERTZ' : 'QWERTY');
     }, []);
 
+    const setLayoutMode = React.useCallback((nextLayout) => {
+        if (nextLayout !== 'QWERTY' && nextLayout !== 'QWERTZ') return;
+        setLayout(nextLayout);
+    }, []);
+
     const isDualLike = isDual || isScaleMode;
     const leftBounds = isScaleMode ? scaleShiftBounds.left : dualShiftBounds.left;
     const rightBounds = isScaleMode ? scaleShiftBounds.right : dualShiftBounds.right;
@@ -589,6 +779,7 @@ export const usePianoEngine = ({
     return {
         layout,
         toggleLayout,
+        setLayoutMode,
         currentMode,
         currentScale,
         isDual,
@@ -606,5 +797,9 @@ export const usePianoEngine = ({
         pressedNotes,
         handleMouseDown,
         handleMouseUp,
+        playFeel,
+        pressedInputKeys,
+        triggerInputDown,
+        triggerInputUp,
     };
 };

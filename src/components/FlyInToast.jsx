@@ -1,7 +1,9 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../context/useToast';
 import CubeFlipText from './CubeFlipText';
+
+const MotionDiv = motion.div;
 
 const ToastCard = ({ toast, index, variants }) => {
     const contentText = toast.content ?? '';
@@ -35,7 +37,7 @@ const ToastCard = ({ toast, index, variants }) => {
     };
 
     return (
-        <motion.div
+        <MotionDiv
             key={toast.id} // Important: tells Framer it's a new item
             variants={variants}
             initial="initial"
@@ -93,7 +95,7 @@ const ToastCard = ({ toast, index, variants }) => {
                     }}
                 />
             </div>
-        </motion.div>
+        </MotionDiv>
     );
 };
 

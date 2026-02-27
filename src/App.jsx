@@ -2,12 +2,13 @@ import React from 'react';
 import * as Tone from 'tone';
 import './index.css';
 import FlyInToast from './components/FlyInToast';
-import AppHeader from './components/AppHeader';
 import PianoKeyboard from './components/PianoKeyboard';
 import { usePianoEngine } from './hooks/usePianoEngine';
 import CubeFlipElement from './components/CubeFlipText';
 import { SCALE_PRESETS } from './components/notes';
-import BackgroundShapes from './components/BackgroundWaves.jsx';
+import MenuWaves from './components/MenuWaves.jsx';
+import PianoWaves from './components/PianoWaves.jsx';
+import KeyBindingGuide from './components/KeyBindingGuide.jsx';
 
 function App() {
     const [hasAudioStarted, setHasAudioStarted] = React.useState(false);
@@ -17,6 +18,7 @@ function App() {
         showNoteNames: false,
         showModeToast: true,
         showScaleToast: true,
+        showPianoWaves: false,
     });
 
     const scaleRoots = React.useMemo(() => {
@@ -68,32 +70,6 @@ function App() {
         enableModeToast: uiSettings.showModeToast,
         enableScaleToast: uiSettings.showScaleToast,
     });
-    const [scaleFlip, setScaleFlip] = React.useState(() => ({
-        text: piano.currentScale?.label ?? '',
-        direction: 'up',
-    }));
-    const prevScaleRef = React.useRef(piano.currentScale);
-
-    React.useEffect(() => {
-        const nextScale = piano.currentScale;
-        if (!nextScale) return;
-        const prevScale = prevScaleRef.current;
-
-        if (!prevScale) {
-            prevScaleRef.current = nextScale;
-            setScaleFlip({ text: nextScale.label, direction: 'up' });
-            return;
-        }
-
-        if (prevScale.label === nextScale.label) {
-            prevScaleRef.current = nextScale;
-            return;
-        }
-
-        const direction = getScaleFlipDirection(prevScale, nextScale);
-        prevScaleRef.current = nextScale;
-        setScaleFlip({ text: nextScale.label, direction });
-    }, [piano.currentScale, getScaleFlipDirection]);
 
     const handleStart = async () => {
         if (!hasAudioStarted) {
@@ -137,28 +113,12 @@ function App() {
     return (
         <div className="app-container">
             <FlyInToast />
-            <BackgroundShapes isHidden={!isMenuOpen || isTitleHovered} />
-
-            {/* 2. HEADER (Always visible) */}
-            {false && (
-                <AppHeader
-                    onOpenSettings={() => setIsMenuOpen(true)}
-                    isDualLike={piano.isDualLike}
-                    leftShift={piano.leftShift}
-                    rightShift={piano.rightShift}
-                    leftBounds={piano.leftBounds}
-                    rightBounds={piano.rightBounds}
-                    singleShiftBounds={piano.singleShiftBounds}
-                    onChangeShift={piano.changeShift}
-                    currentMode={piano.currentMode}
-                    onShiftMode={piano.shiftMode}
-                    isScaleMode={piano.isScaleMode}
-                    currentScaleLabel={piano.currentScale.label}
-                    onShiftScale={piano.shiftScale}
-                />
+            <MenuWaves isHidden={!isMenuOpen || isTitleHovered} />
+            {!isMenuOpen && uiSettings.showPianoWaves && (
+                <PianoWaves playFeel={piano.playFeel} />
             )}
 
-            {/* 3. MAIN CONTENT */}
+            {/* 2. MAIN CONTENT */}
             <CubeFlipElement
                 isFlipped={!isMenuOpen}
                 direction="up"
@@ -200,6 +160,19 @@ function App() {
                 )}
             />
 
+            {!isMenuOpen && (
+                <KeyBindingGuide
+                    layout={piano.layout}
+                    setLayoutMode={piano.setLayoutMode}
+                    pressedInputKeys={piano.pressedInputKeys}
+                    onInputDown={piano.triggerInputDown}
+                    onInputUp={piano.triggerInputUp}
+                />
+            )}
+
+            {isMenuOpen && (
+                <footer className="menu-credit">by Ole Neckritz</footer>
+            )}
 
         </div>
     );
